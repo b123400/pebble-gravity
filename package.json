@@ -1,0 +1,40 @@
+{
+  "name": "gravity",
+  "author": "b123400",
+  "version": "1.0.0",
+  "keywords": [
+    "pebble-app"
+  ],
+  "private": true,
+  "dependencies": {
+    "@rebble/clay": "^1.1.0"
+  },
+  "pebble": {
+    "displayName": "gravity",
+    "uuid": "a6885e23-4ebb-4269-a08b-a1e4eaa95672",
+    "sdkVersion": "3",
+    "enableMultiJS": true,
+    "targetPlatforms": [
+      "aplite",
+      "basalt",
+      "chalk",
+      "diorite",
+      "emery",
+      "flint",
+      "gabbro"
+    ],
+    "watchapp": {
+      "watchface": true
+    },
+    "capabilities": [
+      "configurable"
+    ],
+    "messageKeys": [
+      "background_color",
+      "dot_color"
+    ],
+    "resources": {
+      "media": []
+    }
+  }
+}

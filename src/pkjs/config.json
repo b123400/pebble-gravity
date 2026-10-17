@@ -1,0 +1,29 @@
+[
+  {
+    "type": "section",
+    "items": [
+      {
+        "type": "heading",
+        "defaultValue": "🧲"
+      },
+      {
+        "type": "color",
+        "messageKey": "background_color",
+        "defaultValue": "CD2231",
+        "label": "Background Color",
+        "allowGray": true
+      },
+      {
+        "type": "color",
+        "messageKey": "dot_color",
+        "defaultValue": "FFFFFF",
+        "label": "Dot Color",
+        "allowGray": true
+      },
+      {
+        "type": "submit",
+        "defaultValue": "Save"
+      }
+    ]
+  }
+]
