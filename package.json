@@ -1,5 +1,5 @@
 {
-  "name": "gravity",
+  "name": "Gravity",
   "author": "b123400",
   "version": "1.0.0",
   "keywords": [
@@ -31,7 +31,11 @@
     ],
     "messageKeys": [
       "background_color",
-      "dot_color"
+      "dot_color",
+      "repel",
+      "intensity",
+      "dot_size",
+      "density"
     ],
     "resources": {
       "media": []
