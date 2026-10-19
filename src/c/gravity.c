@@ -27,33 +27,46 @@ typedef struct ClaySettings {
 } ClaySettings;
 static ClaySettings settings;
 
-// How hard a hand pulls a dot. Writes the closest point on the hand into
-// closest_x/closest_y and returns the pull ratio.
-// hand_unit_x/y is the unit vector from the center to the tip of the hand.
+// Pull of a hand on a dot, treating the hand as a uniform rod of mass from the
+// center to the tip, and adding up inverse-square gravity from every point
+// along it. A rod pulls hardest beside its middle, only about half as hard
+// past either end, and from far away it acts like a single mass at its middle,
+// so neither the tip nor the center stands out.
+// Adds the pull to *pull_x/*pull_y and returns the dot's distance to the hand.
+// softening keeps the pull finite for dots right on the hand.
 static float hand_pull(GPoint point, GPoint midpoint,
                        float hand_unit_x, float hand_unit_y, float hand_length,
-                       float reach, float *closest_x, float *closest_y) {
-  // Project the dot onto the hand, clamped to the hand's segment
+                       float softening, float *pull_x, float *pull_y) {
   float to_point_x = point.x - midpoint.x;
   float to_point_y = point.y - midpoint.y;
   float distance_along_hand = to_point_x * hand_unit_x + to_point_y * hand_unit_y;
+
+  // From the dot to the closest point on the line through the hand
+  float across_x = midpoint.x + hand_unit_x * distance_along_hand - point.x;
+  float across_y = midpoint.y + hand_unit_y * distance_along_hand - point.y;
+  float across_squared = across_x * across_x + across_y * across_y + softening * softening;
+
+  // The rod runs from start to end, measured along the hand from the dot.
+  // Integrating the pull over it gives these exact formulas.
+  float start = -distance_along_hand;
+  float end = hand_length - distance_along_hand;
+  float to_start = sm_sqrt(start * start + across_squared);
+  float to_end = sm_sqrt(end * end + across_squared);
+  float pull_along = 1 / to_start - 1 / to_end;
+  float pull_across = (end / to_end - start / to_start) / across_squared;
+
+  *pull_x += pull_along * hand_unit_x + pull_across * across_x;
+  *pull_y += pull_along * hand_unit_y + pull_across * across_y;
+
+  // Distance to the hand itself, clamped to the rod
   if (distance_along_hand < 0) distance_along_hand = 0;
   if (distance_along_hand > hand_length) distance_along_hand = hand_length;
-
-  *closest_x = midpoint.x + hand_unit_x * distance_along_hand;
-  *closest_y = midpoint.y + hand_unit_y * distance_along_hand;
-  float closest_distance_to_hand = sm_sqrt(
-    sm_powint(point.x - *closest_x, 2) +
-    sm_powint(point.y - *closest_y, 2));
-
-  // Closer dots are pulled harder
-  float distance_ratio = closest_distance_to_hand / reach; // To be fine tuned
-  float moving_ratio = 0.5 / (1 + distance_ratio * distance_ratio); // To be fine tuned
-  if (moving_ratio < 0) moving_ratio = 0;
-  return moving_ratio;
+  float closest_x = midpoint.x + hand_unit_x * distance_along_hand - point.x;
+  float closest_y = midpoint.y + hand_unit_y * distance_along_hand - point.y;
+  return sm_sqrt(closest_x * closest_x + closest_y * closest_y);
 }
 
-// Cube root, used by hand_push. A bit trick gives a first guess within a few
+// Cube root, used by the attract pull. A bit trick gives a first guess within a few
 // percent, then two Newton steps make it accurate.
 static float cube_root(float x) {
   if (x <= 0) return 0;
@@ -70,23 +83,21 @@ static float cube_root(float x) {
 }
 
 // Pushes the dot at (*x, *y) away from a hand, distorting the grid around it.
-// Three effects are added together, all scaled by strength:
-// - A lens: a dot at distance d from the hand moves to
-//   (d^1.5 + gap^1.5)^(2/3). This opens a clear gap around the hand.
+// Two effects are added together, both scaled by strength:
+// - A lens: a dot at distance d from the hand moves to sqrt(d^2 + gap^2).
+//   Dots right next to the hand barely spread out, so they pile up into a
+//   crisp wall along the edge of the gap, which outlines the hand.
 // - A long-range push that fades out slowly, so grid lines curve across the
-//   whole screen.
-// - A light shear along the hand towards the tip, so the grid looks swirled
-//   rather than just pushed apart.
+//   whole screen. It shrinks with distance too, so it adds to the wall
+//   instead of thinning it out.
 // reach is the minute hand's length; the sizes below are fractions of it so
 // they fit any screen.
 static void hand_push(float *x, float *y, GPoint midpoint,
                       float hand_unit_x, float hand_unit_y, float hand_length,
                       float reach, float strength) {
-  float gap = reach * 0.11 * strength;         // To be fine tuned
-  float push = reach * 0.11 * strength;        // To be fine tuned
-  float push_range = reach * 0.625;            // To be fine tuned
-  float shear = reach * 0.083 * strength;      // To be fine tuned
-  float shear_range = reach * 0.3;             // To be fine tuned
+  float gap = reach * 0.083 * strength;        // To be fine tuned
+  float push = reach * 0.083 * strength;       // To be fine tuned
+  float push_range = reach * 0.83;             // To be fine tuned
 
   // Project the dot onto the hand, clamped to the hand's segment
   float to_point_x = *x - midpoint.x;
@@ -110,14 +121,12 @@ static void hand_push(float *x, float *y, GPoint midpoint,
   }
 
   float d = closest_distance_to_hand;
-  float new_distance = cube_root(d * sm_sqrt(d) + gap * sm_sqrt(gap));
-  new_distance *= new_distance;
+  float new_distance = sm_sqrt(d * d + gap * gap);
   float outward = (new_distance - d)
     + push * push_range * push_range / (d * d + push_range * push_range);
-  float along = shear * shear_range * shear_range / (d * d + shear_range * shear_range);
 
-  *x += away_x * outward + hand_unit_x * along;
-  *y += away_y * outward + hand_unit_y * along;
+  *x += away_x * outward;
+  *y += away_y * outward;
 }
 
 static void bitmap_layer_update_proc(Layer *layer, GContext* ctx) {
@@ -165,6 +174,10 @@ static void bitmap_layer_update_proc(Layer *layer, GContext* ctx) {
 
   // Scales both the pull and the push. 1.0 at the default intensity of 50.
   float strength = intensity / 50.0f;
+  // Attract constants, as fractions of the minute hand so they fit any screen.
+  // The pull is measured in 1/pixels, so its cube root needs reach^(4/3).
+  float softening = minute_hand_length * 0.07; // To be fine tuned
+  float attract_scale = 0.407 * minute_hand_length * cube_root(minute_hand_length) * strength; // To be fine tuned
 
   // The grid reaches 100px past each edge of the screen, so attract has dots
   // to pull in and repel doesn't leave the edges empty.
@@ -196,26 +209,29 @@ static void bitmap_layer_update_proc(Layer *layer, GContext* ctx) {
         move_x = x - point.x;
         move_y = y - point.y;
       } else {
-        // Both hands use the same reach so their pull falls off the same way
-        float minute_closest_x, minute_closest_y, hour_closest_x, hour_closest_y;
-        float minute_ratio = hand_pull(point, midpoint, minute_unit_x, minute_unit_y,
-                                       minute_hand_length, minute_hand_length,
-                                       &minute_closest_x, &minute_closest_y);
-        float hour_ratio = hand_pull(point, midpoint, hour_unit_x, hour_unit_y,
-                                     hour_hand_length, minute_hand_length,
-                                     &hour_closest_x, &hour_closest_y);
-        minute_ratio *= strength;
-        hour_ratio *= strength;
+        // Add up the pull of both hands
+        float pull_x = 0, pull_y = 0;
+        float minute_distance = hand_pull(point, midpoint, minute_unit_x, minute_unit_y,
+                                          minute_hand_length, softening, &pull_x, &pull_y);
+        float hour_distance = hand_pull(point, midpoint, hour_unit_x, hour_unit_y,
+                                        hour_hand_length, softening, &pull_x, &pull_y);
+        float distance = MIN(minute_distance, hour_distance);
+        float pull = sm_sqrt(pull_x * pull_x + pull_y * pull_y);
 
-        // Add up both pulls. If they add up to more than 1 (near the center,
-        // where both hands meet), scale them down so the dot lands between the
-        // two targets instead of overshooting past them.
-        move_x = (minute_closest_x - point.x) * minute_ratio + (hour_closest_x - point.x) * hour_ratio;
-        move_y = (minute_closest_y - point.y) * minute_ratio + (hour_closest_y - point.y) * hour_ratio;
-        float total_ratio = minute_ratio + hour_ratio;
-        if (total_ratio > 1) {
-          move_x /= total_ratio;
-          move_y /= total_ratio;
+        move_x = 0;
+        move_y = 0;
+        if (pull > 0 && distance > 0) {
+          // Far from the hands the pull fades as 1/d^2, which barely bends the
+          // grid. Its cube root reaches further, so the whole screen warps.
+          float move = attract_scale * cube_root(pull);
+          // Smoothly limit the move to short of the hand, so dots gather into a
+          // soft band along it instead of jumping past it. Closer to 1 makes
+          // the band a sharper line.
+          float limit = 0.85 * distance; // To be fine tuned
+          float ratio = move / limit;
+          move = limit * ratio / sm_sqrt(1 + ratio * ratio);
+          move_x = pull_x / pull * move;
+          move_y = pull_y / pull * move;
         }
       }
 
