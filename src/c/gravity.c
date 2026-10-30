@@ -142,7 +142,11 @@ static void bitmap_layer_update_proc(Layer *layer, GContext* ctx) {
   int hour = (*t).tm_hour;
 #endif
 
+#if PBL_ROUND
   GRect bounds = layer_get_bounds(layer);
+#else //is PBL_RECT
+  GRect bounds = layer_get_unobstructed_bounds(layer);
+#endif //PBL_ROUND
 
   // background color
   graphics_context_set_fill_color(ctx, background_color);
