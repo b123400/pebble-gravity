@@ -1,5 +1,8 @@
 # gravity
 
+![Screenshot](https://raw.githubusercontent.com/b123400/pebble-gravity/refs/heads/master/store-screenshots/emery/1-default-10-10.png)
+![Screenshot](https://raw.githubusercontent.com/b123400/pebble-gravity/refs/heads/master/store-screenshots/emery/2-default-03-40.png)
+
 A Pebble watchapp/watchface written in C using the Pebble SDK.
 
 ## Building & running
