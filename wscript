@@ -29,9 +29,17 @@ def build(ctx):
     build_worker = os.path.exists('worker_src')
     binaries = []
 
+    # SCREENSHOT_TIME=HH:MM builds a watch face frozen at that time, for store
+    # screenshots (see scripts/screenshots.sh)
+    screenshot_time = os.environ.get('SCREENSHOT_TIME')
+
     cached_env = ctx.env
     for platform in ctx.env.TARGET_PLATFORMS:
         ctx.env = ctx.all_envs[platform]
+        if screenshot_time:
+            hour, minute = screenshot_time.split(':')
+            ctx.env.append_value('DEFINES', ['SCREENSHOT_HOUR={}'.format(int(hour)),
+                                             'SCREENSHOT_MINUTE={}'.format(int(minute))])
         ctx.set_group(ctx.env.PLATFORM_NAME)
         app_elf = '{}/pebble-app.elf'.format(ctx.env.BUILD_DIR)
         ctx.pbl_build(source=ctx.path.ant_glob('src/c/**/*.c'), target=app_elf, bin_type='app')

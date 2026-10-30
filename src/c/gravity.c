@@ -130,10 +130,17 @@ static void hand_push(float *x, float *y, GPoint midpoint,
 }
 
 static void bitmap_layer_update_proc(Layer *layer, GContext* ctx) {
+#ifdef SCREENSHOT_HOUR
+  // Fixed time for store screenshots, set by `SCREENSHOT_TIME=HH:MM pebble build`
+  // (see scripts/screenshots.sh)
+  int minute = SCREENSHOT_MINUTE;
+  int hour = SCREENSHOT_HOUR;
+#else
   time_t now = time(NULL);
   struct tm *t = localtime(&now);
   int minute = (*t).tm_min;
   int hour = (*t).tm_hour;
+#endif
 
   GRect bounds = layer_get_bounds(layer);
 

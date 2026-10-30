@@ -13,6 +13,18 @@ pebble install --emulator emery       # install on the emery emulator
 pebble install --phone <ip>           # install to a paired phone
 ```
 
+## Store screenshots
+
+```sh
+scripts/screenshots.sh                # every platform, into store-screenshots/
+scripts/screenshots.sh basalt chalk   # only some platforms
+```
+
+The scenes (file name, time and settings) are listed at the top of
+`scripts/screenshots.sh`. Each one is built with the time frozen
+(`SCREENSHOT_TIME=HH:MM pebble build`), and its settings are sent to the
+emulator the same way the phone sends them.
+
 ## Target platforms
 
 `targetPlatforms` in `package.json` controls which watches you build for. The
